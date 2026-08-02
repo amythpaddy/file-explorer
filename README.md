@@ -1,4 +1,4 @@
-# temp-app
+# File Explorer
 
 An Electron application with React and TypeScript
 
