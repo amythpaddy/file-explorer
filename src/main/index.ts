@@ -1,4 +1,13 @@
-import { app, shell, BrowserWindow, ipcMain, protocol, net } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  protocol,
+  net,
+  Menu,
+  MenuItemConstructorOptions
+} from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -11,9 +20,95 @@ import * as ExifReader from 'exifreader'
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'media',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true, stream: true }
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
   }
 ])
+
+let showHidden = false
+
+function updateMenuCheckbox(checked: boolean): void {
+  const menu = Menu.getApplicationMenu()
+  if (menu) {
+    const item = menu.getMenuItemById('toggle-hidden')
+    if (item) {
+      item.checked = checked
+    }
+  }
+}
+
+function setupMenu(mainWindow: BrowserWindow): void {
+  const template: MenuItemConstructorOptions[] = [
+    ...(process.platform === 'darwin'
+      ? ([{ role: 'appMenu' }] as MenuItemConstructorOptions[])
+      : []),
+    {
+      label: 'File',
+      submenu: [{ role: 'quit' }]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ] as MenuItemConstructorOptions[]
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          id: 'toggle-hidden',
+          label: 'Show Hidden Files',
+          type: 'checkbox',
+          checked: showHidden,
+          accelerator: 'CmdOrCtrl+H',
+          click: (menuItem) => {
+            showHidden = menuItem.checked
+            mainWindow.webContents.send('toggle-hidden-files', showHidden)
+          }
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ] as MenuItemConstructorOptions[]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(process.platform === 'darwin'
+          ? ([
+              { type: 'separator' },
+              { role: 'front' },
+              { type: 'separator' },
+              { role: 'window' }
+            ] as MenuItemConstructorOptions[])
+          : ([{ role: 'close' }] as MenuItemConstructorOptions[]))
+      ]
+    }
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -21,13 +116,16 @@ function createWindow(): void {
     width: 1200,
     height: 800,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
+    frame: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
+
+  setupMenu(mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -130,7 +228,7 @@ app.whenReady().then(() => {
   ipcMain.handle('get-media-metadata', async (_event, filePath: string) => {
     const ext = path.extname(filePath).toLowerCase()
     const result: any = { type: 'unknown' }
-    
+
     try {
       if (['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)) {
         result.type = 'image'
@@ -138,7 +236,7 @@ app.whenReady().then(() => {
         try {
           const tags = ExifReader.load(buffer)
           const exif: any = {}
-          
+
           if (tags['DateTimeOriginal']) exif.dateTime = tags['DateTimeOriginal'].description
           if (tags['Make']) exif.make = tags['Make'].description
           if (tags['Model']) exif.model = tags['Model'].description
@@ -166,7 +264,7 @@ app.whenReady().then(() => {
         result.type = 'audio'
         const mm = await (eval('import("music-metadata")') as Promise<any>)
         const metadata = await mm.parseFile(filePath)
-        
+
         const audioInfo: any = {
           title: metadata.common.title || path.basename(filePath, ext),
           artist: metadata.common.artist || 'Unknown Artist',
@@ -177,7 +275,7 @@ app.whenReady().then(() => {
           bitrate: metadata.format.bitrate,
           format: metadata.format.container
         }
-        
+
         if (metadata.common.picture && metadata.common.picture.length > 0) {
           const pic = metadata.common.picture[0]
           const base64 = pic.data.toString('base64')
@@ -201,6 +299,15 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('toggle-hidden-files-request', () => {
+    showHidden = !showHidden
+    updateMenuCheckbox(showHidden)
+    const windows = BrowserWindow.getAllWindows()
+    for (const win of windows) {
+      win.webContents.send('toggle-hidden-files', showHidden)
+    }
+  })
+
   createWindow()
 
   app.on('activate', function () {
@@ -213,7 +320,6 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.

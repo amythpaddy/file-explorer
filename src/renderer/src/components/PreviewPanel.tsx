@@ -38,7 +38,9 @@ export default function PreviewPanel({ selectedFile, metadata, loading }: Previe
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '0:00'
     const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60).toString().padStart(2, '0')
+    const secs = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, '0')
     return `${mins}:${secs}`
   }
 
@@ -58,12 +60,19 @@ export default function PreviewPanel({ selectedFile, metadata, loading }: Previe
   return (
     <div className="preview-panel fade-in">
       <div className="preview-header">
-        <span className={`file-type-badge ${
-          selectedFile.isDirectory ? 'badge-folder' : 
-          metadata?.type === 'image' ? 'badge-image' :
-          metadata?.type === 'audio' ? 'badge-audio' :
-          metadata?.type === 'video' ? 'badge-video' : 'badge-file'
-        }`}>
+        <span
+          className={`file-type-badge ${
+            selectedFile.isDirectory
+              ? 'badge-folder'
+              : metadata?.type === 'image'
+                ? 'badge-image'
+                : metadata?.type === 'audio'
+                  ? 'badge-audio'
+                  : metadata?.type === 'video'
+                    ? 'badge-video'
+                    : 'badge-file'
+          }`}
+        >
           {selectedFile.isDirectory ? 'Folder' : metadata?.type || 'File'}
         </span>
         <div className="preview-header-title">Overview</div>
@@ -77,11 +86,30 @@ export default function PreviewPanel({ selectedFile, metadata, loading }: Previe
         ) : selectedFile.isDirectory ? (
           <FolderPreview folder={selectedFile} formatDate={formatDate} />
         ) : metadata?.type === 'image' ? (
-          <ImagePreview file={selectedFile} fileUrl={fileUrl} exif={metadata.exif} formatSize={formatSize} formatDate={formatDate} />
+          <ImagePreview
+            file={selectedFile}
+            fileUrl={fileUrl}
+            exif={metadata.exif}
+            formatSize={formatSize}
+            formatDate={formatDate}
+          />
         ) : metadata?.type === 'audio' ? (
-          <AudioPreview file={selectedFile} fileUrl={fileUrl} audio={metadata.audio} formatDuration={formatDuration} formatSize={formatSize} />
+          <AudioPreview
+            file={selectedFile}
+            fileUrl={fileUrl}
+            audio={metadata.audio}
+            formatDuration={formatDuration}
+            formatSize={formatSize}
+          />
         ) : metadata?.type === 'video' ? (
-          <VideoPreview file={selectedFile} fileUrl={fileUrl} video={metadata.video} formatDuration={formatDuration} formatSize={formatSize} formatDate={formatDate} />
+          <VideoPreview
+            file={selectedFile}
+            fileUrl={fileUrl}
+            video={metadata.video}
+            formatDuration={formatDuration}
+            formatSize={formatSize}
+            formatDate={formatDate}
+          />
         ) : (
           <GenericFilePreview file={selectedFile} formatSize={formatSize} formatDate={formatDate} />
         )}
@@ -94,8 +122,18 @@ export default function PreviewPanel({ selectedFile, metadata, loading }: Previe
 function FolderPreview({ folder, formatDate }: { folder: any; formatDate: any }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="preview-visual-container ratio-square" style={{ background: 'rgba(139, 92, 246, 0.05)', color: 'var(--color-folder)' }}>
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <div
+        className="preview-visual-container ratio-square"
+        style={{ background: 'rgba(139, 92, 246, 0.05)', color: 'var(--color-folder)' }}
+      >
+        <svg
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
           <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
         </svg>
       </div>
@@ -108,7 +146,9 @@ function FolderPreview({ folder, formatDate }: { folder: any; formatDate: any })
           <tbody>
             <tr className="metadata-row">
               <td className="metadata-label">Full Path</td>
-              <td className="metadata-value" title={folder.path}>{folder.path}</td>
+              <td className="metadata-value" title={folder.path}>
+                {folder.path}
+              </td>
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">Last Modified</td>
@@ -122,7 +162,19 @@ function FolderPreview({ folder, formatDate }: { folder: any; formatDate: any })
 }
 
 /* ================= Image Preview ================= */
-function ImagePreview({ file, fileUrl, exif, formatSize, formatDate }: { file: any; fileUrl: string; exif: any; formatSize: any; formatDate: any }) {
+function ImagePreview({
+  file,
+  fileUrl,
+  exif,
+  formatSize,
+  formatDate
+}: {
+  file: any
+  fileUrl: string
+  exif: any
+  formatSize: any
+  formatDate: any
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="preview-visual-container ratio-image">
@@ -137,7 +189,9 @@ function ImagePreview({ file, fileUrl, exif, formatSize, formatDate }: { file: a
           <tbody>
             <tr className="metadata-row">
               <td className="metadata-label">Dimensions</td>
-              <td className="metadata-value">{exif?.width && exif?.height ? `${exif.width} × ${exif.height} px` : 'Unknown'}</td>
+              <td className="metadata-value">
+                {exif?.width && exif?.height ? `${exif.width} × ${exif.height} px` : 'Unknown'}
+              </td>
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">File Size</td>
@@ -234,10 +288,12 @@ function AudioPreview({ file, fileUrl, audio, formatDuration, formatSize }: Audi
 
     ws.on('play', () => setIsPlaying(true))
     ws.on('pause', () => setIsPlaying(false))
-    
+
     const formatTime = (time: number) => {
       const minutes = Math.floor(time / 60)
-      const seconds = Math.floor(time % 60).toString().padStart(2, '0')
+      const seconds = Math.floor(time % 60)
+        .toString()
+        .padStart(2, '0')
       return `${minutes}:${seconds}`
     }
 
@@ -273,7 +329,9 @@ function AudioPreview({ file, fileUrl, audio, formatDuration, formatSize }: Audi
       </div>
 
       <div>
-        <h3 className="file-title-large" style={{ fontSize: 16 }}>{audio?.title || file.name}</h3>
+        <h3 className="file-title-large" style={{ fontSize: 16 }}>
+          {audio?.title || file.name}
+        </h3>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
           {audio?.artist || 'Unknown Artist'}
         </p>
@@ -284,7 +342,11 @@ function AudioPreview({ file, fileUrl, audio, formatDuration, formatSize }: Audi
         <div className="audio-controls">
           <span className="audio-time">{currentTime}</span>
           <button className="audio-btn" onClick={togglePlay}>
-            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />}
+            {isPlaying ? (
+              <Pause size={18} fill="currentColor" />
+            ) : (
+              <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
+            )}
           </button>
           <span className="audio-time">{totalTime || formatDuration(audio?.duration)}</span>
         </div>
@@ -306,15 +368,21 @@ function AudioPreview({ file, fileUrl, audio, formatDuration, formatSize }: Audi
             )}
             <tr className="metadata-row">
               <td className="metadata-label">Format</td>
-              <td className="metadata-value" style={{ textTransform: 'uppercase' }}>{audio?.format || 'Unknown'}</td>
+              <td className="metadata-value" style={{ textTransform: 'uppercase' }}>
+                {audio?.format || 'Unknown'}
+              </td>
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">Bitrate</td>
-              <td className="metadata-value">{audio?.bitrate ? `${Math.round(audio.bitrate / 1000)} kbps` : 'Unknown'}</td>
+              <td className="metadata-value">
+                {audio?.bitrate ? `${Math.round(audio.bitrate / 1000)} kbps` : 'Unknown'}
+              </td>
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">Sample Rate</td>
-              <td className="metadata-value">{audio?.sampleRate ? `${audio.sampleRate / 1000} kHz` : 'Unknown'}</td>
+              <td className="metadata-value">
+                {audio?.sampleRate ? `${audio.sampleRate / 1000} kHz` : 'Unknown'}
+              </td>
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">File Size</td>
@@ -328,7 +396,21 @@ function AudioPreview({ file, fileUrl, audio, formatDuration, formatSize }: Audi
 }
 
 /* ================= Video Preview ================= */
-function VideoPreview({ file, fileUrl, video, formatDuration, formatSize, formatDate }: { file: any; fileUrl: string; video: any; formatDuration: any; formatSize: any; formatDate: any }) {
+function VideoPreview({
+  file,
+  fileUrl,
+  video,
+  formatDuration,
+  formatSize,
+  formatDate
+}: {
+  file: any
+  fileUrl: string
+  video: any
+  formatDuration: any
+  formatSize: any
+  formatDate: any
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="preview-visual-container ratio-video">
@@ -348,7 +430,9 @@ function VideoPreview({ file, fileUrl, video, formatDuration, formatSize, format
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">Format</td>
-              <td className="metadata-value" style={{ textTransform: 'uppercase' }}>{video?.format || 'Unknown'}</td>
+              <td className="metadata-value" style={{ textTransform: 'uppercase' }}>
+                {video?.format || 'Unknown'}
+              </td>
             </tr>
             {video?.bitrate && (
               <tr className="metadata-row">
@@ -372,10 +456,21 @@ function VideoPreview({ file, fileUrl, video, formatDuration, formatSize, format
 }
 
 /* ================= Generic File Preview ================= */
-function GenericFilePreview({ file, formatSize, formatDate }: { file: any; formatSize: any; formatDate: any }) {
+function GenericFilePreview({
+  file,
+  formatSize,
+  formatDate
+}: {
+  file: any
+  formatSize: any
+  formatDate: any
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="preview-visual-container ratio-square" style={{ background: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-muted)' }}>
+      <div
+        className="preview-visual-container ratio-square"
+        style={{ background: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-muted)' }}
+      >
         <FileText size={64} />
       </div>
       <div>
@@ -391,7 +486,9 @@ function GenericFilePreview({ file, formatSize, formatDate }: { file: any; forma
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">Full Path</td>
-              <td className="metadata-value" title={file.path}>{file.path}</td>
+              <td className="metadata-value" title={file.path}>
+                {file.path}
+              </td>
             </tr>
             <tr className="metadata-row">
               <td className="metadata-label">Created</td>

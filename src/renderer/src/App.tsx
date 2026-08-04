@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
-import { 
-  Folder, File, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon, 
-  Search, Grid, List, ArrowUp, HardDrive, Home, ChevronRight, FileText
+import {
+  Folder,
+  File,
+  Image as ImageIcon,
+  Music as MusicIcon,
+  Video as VideoIcon,
+  Search,
+  Grid,
+  List,
+  ArrowUp,
+  HardDrive,
+  Home,
+  ChevronRight,
+  FileText,
+  SlidersHorizontal,
+  Check
 } from 'lucide-react'
 import PreviewPanel from './components/PreviewPanel'
 
@@ -18,6 +31,9 @@ export default function App() {
   const [metadata, setMetadata] = useState<any | null>(null)
   const [metadataLoading, setMetadataLoading] = useState(false)
 
+  const [showHidden, setShowHidden] = useState(false)
+  const [showViewDropdown, setShowViewDropdown] = useState(false)
+
   // Initialize paths and drives
   useEffect(() => {
     async function init() {
@@ -29,6 +45,40 @@ export default function App() {
     }
     init()
   }, [])
+
+  // Listen for hidden files toggle from main process
+  useEffect(() => {
+    window.api.onToggleHiddenFiles((show: boolean) => {
+      setShowHidden(show)
+    })
+  }, [])
+
+  // Listen for Ctrl+H (or Cmd+H on macOS) locally
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'h') {
+        e.preventDefault()
+        window.api.toggleHiddenFiles()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showViewDropdown) return
+    const handleOutsideClick = () => {
+      setShowViewDropdown(false)
+    }
+    window.addEventListener('click', handleOutsideClick)
+    return () => {
+      window.removeEventListener('click', handleOutsideClick)
+    }
+  }, [showViewDropdown])
 
   // Load directory items
   const loadDirectory = async (dirPath: string) => {
@@ -60,7 +110,7 @@ export default function App() {
   const handleItemSelect = async (file: any) => {
     setSelectedFile(file)
     setMetadata(null)
-    
+
     if (file.isDirectory) return
 
     const ext = getExtension(file.name)
@@ -94,10 +144,10 @@ export default function App() {
     // Determine path separator
     const isWindows = currentPath.includes('\\')
     const separator = isWindows ? '\\' : '/'
-    
+
     // Split segments and drop the last one
     const segments = currentPath.split(separator).filter(Boolean)
-    
+
     if (segments.length === 0) return // Already at root
 
     let parentPath = ''
@@ -123,8 +173,9 @@ export default function App() {
   }
 
   const getFileIcon = (file: any) => {
-    if (file.isDirectory) return <Folder size={32} className="logo-icon" style={{ color: 'var(--color-folder)' }} />
-    
+    if (file.isDirectory)
+      return <Folder size={32} className="logo-icon" style={{ color: 'var(--color-folder)' }} />
+
     const ext = getExtension(file.name)
     if (['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)) {
       return <ImageIcon size={32} style={{ color: 'var(--color-image)' }} />
@@ -140,7 +191,7 @@ export default function App() {
 
   const getFileIconSmall = (file: any) => {
     if (file.isDirectory) return <Folder size={18} style={{ color: 'var(--color-folder)' }} />
-    
+
     const ext = getExtension(file.name)
     if (['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)) {
       return <ImageIcon size={18} style={{ color: 'var(--color-image)' }} />
@@ -164,11 +215,19 @@ export default function App() {
 
   const formatDate = (ms?: number) => {
     if (!ms) return ''
-    return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    return new Date(ms).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
   }
 
   // Filter and search computation
-  const filteredFiles = files.filter(file => {
+  const filteredFiles = files.filter((file) => {
+    if (!showHidden && file.name.startsWith('.')) {
+      return false
+    }
+
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase())
     if (!matchesSearch) return false
 
@@ -191,10 +250,10 @@ export default function App() {
   const navigateToShortcut = async (name: string) => {
     const home = await window.api.getHomePath()
     let target = home
-    
+
     // Windows vs Linux path compatibility
     const separator = home.includes('\\') ? '\\' : '/'
-    
+
     if (name === 'home') target = home
     else if (name === 'desktop') target = `${home}${separator}Desktop`
     else if (name === 'documents') target = `${home}${separator}Documents`
@@ -202,7 +261,7 @@ export default function App() {
     else if (name === 'pictures') target = `${home}${separator}Pictures`
     else if (name === 'music') target = `${home}${separator}Music`
     else if (name === 'videos') target = `${home}${separator}Videos`
-    
+
     loadDirectory(target)
   }
 
@@ -210,13 +269,17 @@ export default function App() {
   const renderBreadcrumbs = () => {
     const separator = currentPath.includes('\\') ? '\\' : '/'
     const segments = currentPath.split(separator).filter(Boolean)
-    
+
     const breadcrumbs: React.ReactNode[] = []
     let accumulatedPath = currentPath.startsWith('/') ? '' : ''
 
     if (currentPath.startsWith('/')) {
       breadcrumbs.push(
-        <span key="root" className="path-segment breadcrumb-root" onClick={() => loadDirectory('/')}>
+        <span
+          key="root"
+          className="path-segment breadcrumb-root"
+          onClick={() => loadDirectory('/')}
+        >
           <HardDrive size={14} />
         </span>
       )
@@ -229,12 +292,20 @@ export default function App() {
         if (idx === 0) accumulatedPath = segment + separator
         else accumulatedPath += segment + (idx === segments.length - 1 ? '' : separator)
       }
-      
+
       const currentAccPath = accumulatedPath
 
-      breadcrumbs.push(<span key={`sep-${idx}`} className="path-separator"><ChevronRight size={12} /></span>)
       breadcrumbs.push(
-        <span key={`seg-${idx}`} className="path-segment" onClick={() => loadDirectory(currentAccPath)}>
+        <span key={`sep-${idx}`} className="path-separator">
+          <ChevronRight size={12} />
+        </span>
+      )
+      breadcrumbs.push(
+        <span
+          key={`seg-${idx}`}
+          className="path-segment"
+          onClick={() => loadDirectory(currentAccPath)}
+        >
           {segment}
         </span>
       )
@@ -248,7 +319,15 @@ export default function App() {
       {/* Left Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <svg className="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg
+            className="logo-icon"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
           <span className="app-title">Media Explorer</span>
@@ -258,14 +337,18 @@ export default function App() {
           {/* Drives Section */}
           <div className="menu-section">
             <span className="menu-title">Devices</span>
-            {drives.map(drive => (
-              <div 
+            {drives.map((drive) => (
+              <div
                 key={drive.path}
                 className={`menu-item ${currentPath === drive.path ? 'active' : ''}`}
                 onClick={() => loadDirectory(drive.path)}
               >
                 <HardDrive size={16} />
-                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{drive.name}</span>
+                <span
+                  style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
+                >
+                  {drive.name}
+                </span>
               </div>
             ))}
           </div>
@@ -273,11 +356,26 @@ export default function App() {
           {/* Quick Shortcuts Section */}
           <div className="menu-section">
             <span className="menu-title">Quick Access</span>
-            <div className="menu-item" onClick={() => navigateToShortcut('home')}><Home size={16} /><span>Home</span></div>
-            <div className="menu-item" onClick={() => navigateToShortcut('desktop')}><Folder size={16} style={{ color: 'var(--color-folder)' }} /><span>Desktop</span></div>
-            <div className="menu-item" onClick={() => navigateToShortcut('pictures')}><ImageIcon size={16} style={{ color: 'var(--color-image)' }} /><span>Pictures</span></div>
-            <div className="menu-item" onClick={() => navigateToShortcut('music')}><MusicIcon size={16} style={{ color: 'var(--color-audio)' }} /><span>Music</span></div>
-            <div className="menu-item" onClick={() => navigateToShortcut('videos')}><VideoIcon size={16} style={{ color: 'var(--color-video)' }} /><span>Videos</span></div>
+            <div className="menu-item" onClick={() => navigateToShortcut('home')}>
+              <Home size={16} />
+              <span>Home</span>
+            </div>
+            <div className="menu-item" onClick={() => navigateToShortcut('desktop')}>
+              <Folder size={16} style={{ color: 'var(--color-folder)' }} />
+              <span>Desktop</span>
+            </div>
+            <div className="menu-item" onClick={() => navigateToShortcut('pictures')}>
+              <ImageIcon size={16} style={{ color: 'var(--color-image)' }} />
+              <span>Pictures</span>
+            </div>
+            <div className="menu-item" onClick={() => navigateToShortcut('music')}>
+              <MusicIcon size={16} style={{ color: 'var(--color-audio)' }} />
+              <span>Music</span>
+            </div>
+            <div className="menu-item" onClick={() => navigateToShortcut('videos')}>
+              <VideoIcon size={16} style={{ color: 'var(--color-video)' }} />
+              <span>Videos</span>
+            </div>
           </div>
         </div>
       </div>
@@ -286,11 +384,19 @@ export default function App() {
       <div className="workspace">
         <div className="workspace-header">
           <div className="path-container">
-            <button 
-              className="control-btn" 
-              onClick={navigateUp} 
-              title="Go Up" 
-              style={{ border: 'none', background: 'transparent', padding: '2px 6px', marginRight: 8, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            <button
+              className="control-btn"
+              onClick={navigateUp}
+              title="Go Up"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: '2px 6px',
+                marginRight: 8,
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer'
+              }}
             >
               <ArrowUp size={14} />
             </button>
@@ -300,59 +406,88 @@ export default function App() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <div className="search-input-wrapper">
               <Search className="search-icon" size={14} />
-              <input 
-                type="text" 
-                className="search-input" 
+              <input
+                type="text"
+                className="search-input"
                 placeholder="Search files..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             <div className="view-controls">
-              <button 
+              <button
                 className={`control-btn ${viewMode === 'grid' ? 'active' : ''}`}
                 onClick={() => setViewMode('grid')}
               >
                 <Grid size={16} />
               </button>
-              <button 
+              <button
                 className={`control-btn ${viewMode === 'list' ? 'active' : ''}`}
                 onClick={() => setViewMode('list')}
               >
                 <List size={16} />
               </button>
             </div>
+
+            <div className="dropdown-container">
+              <button
+                className={`control-btn ${showViewDropdown ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowViewDropdown(!showViewDropdown)
+                }}
+                title="View Options"
+              >
+                <SlidersHorizontal size={16} />
+              </button>
+              {showViewDropdown && (
+                <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="dropdown-item"
+                    onClick={() => {
+                      window.api.toggleHiddenFiles()
+                    }}
+                  >
+                    <div className="dropdown-item-checkbox">
+                      {showHidden && <Check size={14} className="checkbox-icon" />}
+                    </div>
+                    <span>Show Hidden Files</span>
+                    <span className="dropdown-shortcut">Ctrl+H</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Media Filter Tabs */}
         <div style={{ padding: '16px 24px 0', display: 'flex', gap: 8 }}>
-          <button 
-            className={`menu-item ${filterType === 'all' ? 'active' : ''}`} 
+          <button
+            className={`menu-item ${filterType === 'all' ? 'active' : ''}`}
             style={{ padding: '6px 12px', borderRadius: '6px' }}
             onClick={() => setFilterType('all')}
           >
             All Files
           </button>
-          <button 
-            className={`menu-item ${filterType === 'image' ? 'active' : ''}`} 
+          <button
+            className={`menu-item ${filterType === 'image' ? 'active' : ''}`}
             style={{ padding: '6px 12px', borderRadius: '6px' }}
             onClick={() => setFilterType('image')}
           >
             <ImageIcon size={14} style={{ color: 'var(--color-image)', marginRight: 6 }} />
             Images
           </button>
-          <button 
-            className={`menu-item ${filterType === 'audio' ? 'active' : ''}`} 
+          <button
+            className={`menu-item ${filterType === 'audio' ? 'active' : ''}`}
             style={{ padding: '6px 12px', borderRadius: '6px' }}
             onClick={() => setFilterType('audio')}
           >
             <MusicIcon size={14} style={{ color: 'var(--color-audio)', marginRight: 6 }} />
             Music
           </button>
-          <button 
-            className={`menu-item ${filterType === 'video' ? 'active' : ''}`} 
+          <button
+            className={`menu-item ${filterType === 'video' ? 'active' : ''}`}
             style={{ padding: '6px 12px', borderRadius: '6px' }}
             onClick={() => setFilterType('video')}
           >
@@ -370,30 +505,35 @@ export default function App() {
           ) : filteredFiles.length === 0 ? (
             <div className="empty-preview">
               <File size={48} className="empty-preview-icon" />
-              <p className="empty-preview-text">This folder is empty or no files match search criteria</p>
+              <p className="empty-preview-text">
+                This folder is empty or no files match search criteria
+              </p>
             </div>
           ) : viewMode === 'grid' ? (
             <div className="file-grid">
-              {filteredFiles.map(file => {
+              {filteredFiles.map((file) => {
                 const ext = getExtension(file.name)
                 const isSelected = selectedFile?.path === file.path
                 const selectionClass = isSelected
-                  ? file.isDirectory ? 'folder-selected selected'
-                    : ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext) ? 'image-selected selected'
-                    : ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext) ? 'audio-selected selected'
-                    : ['.mp4', '.mkv', '.webm', '.avi', '.mov'].includes(ext) ? 'video-selected selected' : 'selected'
+                  ? file.isDirectory
+                    ? 'folder-selected selected'
+                    : ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)
+                      ? 'image-selected selected'
+                      : ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)
+                        ? 'audio-selected selected'
+                        : ['.mp4', '.mkv', '.webm', '.avi', '.mov'].includes(ext)
+                          ? 'video-selected selected'
+                          : 'selected'
                   : ''
 
                 return (
-                  <div 
-                    key={file.path} 
+                  <div
+                    key={file.path}
                     className={`grid-item ${selectionClass}`}
                     onClick={() => handleItemSelect(file)}
                     onDoubleClick={() => handleItemDoubleClick(file)}
                   >
-                    <div className="grid-icon-wrapper">
-                      {getFileIcon(file)}
-                    </div>
+                    <div className="grid-icon-wrapper">{getFileIcon(file)}</div>
                     <span className="grid-name">{file.name}</span>
                     <span className="grid-meta">
                       {file.isDirectory ? 'Folder' : formatSize(file.size)}
@@ -404,33 +544,34 @@ export default function App() {
             </div>
           ) : (
             <div className="file-list">
-              {filteredFiles.map(file => {
+              {filteredFiles.map((file) => {
                 const ext = getExtension(file.name)
                 const isSelected = selectedFile?.path === file.path
                 const selectionClass = isSelected
-                  ? file.isDirectory ? 'folder-selected selected'
-                    : ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext) ? 'image-selected selected'
-                    : ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext) ? 'audio-selected selected'
-                    : ['.mp4', '.mkv', '.webm', '.avi', '.mov'].includes(ext) ? 'video-selected selected' : 'selected'
+                  ? file.isDirectory
+                    ? 'folder-selected selected'
+                    : ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)
+                      ? 'image-selected selected'
+                      : ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)
+                        ? 'audio-selected selected'
+                        : ['.mp4', '.mkv', '.webm', '.avi', '.mov'].includes(ext)
+                          ? 'video-selected selected'
+                          : 'selected'
                   : ''
 
                 return (
-                  <div 
-                    key={file.path} 
+                  <div
+                    key={file.path}
                     className={`list-item ${selectionClass}`}
                     onClick={() => handleItemSelect(file)}
                     onDoubleClick={() => handleItemDoubleClick(file)}
                   >
-                    <div className="list-icon">
-                      {getFileIconSmall(file)}
-                    </div>
+                    <div className="list-icon">{getFileIconSmall(file)}</div>
                     <span className="list-name">{file.name}</span>
                     <span className="list-size">
                       {file.isDirectory ? '--' : formatSize(file.size)}
                     </span>
-                    <span className="list-date">
-                      {formatDate(file.mtime)}
-                    </span>
+                    <span className="list-date">{formatDate(file.mtime)}</span>
                   </div>
                 )
               })}
@@ -440,11 +581,7 @@ export default function App() {
       </div>
 
       {/* Right Preview Panel */}
-      <PreviewPanel 
-        selectedFile={selectedFile} 
-        metadata={metadata} 
-        loading={metadataLoading} 
-      />
+      <PreviewPanel selectedFile={selectedFile} metadata={metadata} loading={metadataLoading} />
     </>
   )
 }
