@@ -12,6 +12,13 @@ declare global {
       ) => Promise<{ success: boolean; metadata?: any; error?: string }>
       onToggleHiddenFiles: (callback: (show: boolean) => void) => void
       toggleHiddenFiles: () => Promise<void>
+      minimizeWindow: () => Promise<void>
+      maximizeWindow: () => Promise<void>
+      closeWindow: () => Promise<void>
+      isWindowMaximized: () => Promise<boolean>
+      reloadWindow: () => Promise<void>
+      onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => void
+      openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>
     }
   }
 }

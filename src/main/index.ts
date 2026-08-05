@@ -127,6 +127,14 @@ function createWindow(): void {
 
   setupMenu(mainWindow)
 
+  mainWindow.on('maximize', () => {
+    mainWindow.webContents.send('window-maximize-change', true)
+  })
+
+  mainWindow.on('unmaximize', () => {
+    mainWindow.webContents.send('window-maximize-change', false)
+  })
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -230,31 +238,97 @@ app.whenReady().then(() => {
     const result: any = { type: 'unknown' }
 
     try {
-      if (['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)) {
+    const rawImageExts = [
+      '.cr2',
+      '.cr3',
+      '.nef',
+      '.nrw',
+      '.arw',
+      '.srf',
+      '.sr2',
+      '.dng',
+      '.orf',
+      '.rw2',
+      '.raw',
+      '.raf',
+      '.pef',
+      '.ptx',
+      '.srw',
+      '.mrw',
+      '.erf',
+      '.kdc',
+      '.dcr',
+      '.rwl',
+      '.bay',
+      '.3fr',
+      '.fff'
+    ]
+    const standardImageExts = [
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.webp',
+      '.tiff',
+      '.tif',
+      '.bmp',
+      '.gif',
+      '.svg',
+      '.ico',
+      '.heic',
+      '.heif',
+      '.avif'
+    ]
+    const imageExts = [...standardImageExts, ...rawImageExts]
+
+    if (imageExts.includes(ext)) {
         result.type = 'image'
+        result.isRaw = rawImageExts.includes(ext)
         const buffer = await fs.promises.readFile(filePath)
         try {
-          const tags = ExifReader.load(buffer)
+          let tags: any
+          try {
+            tags = ExifReader.load(buffer, { expanded: true })
+          } catch {
+            tags = ExifReader.load(buffer)
+          }
+
           const exif: any = {}
 
-          if (tags['DateTimeOriginal']) exif.dateTime = tags['DateTimeOriginal'].description
-          if (tags['Make']) exif.make = tags['Make'].description
-          if (tags['Model']) exif.model = tags['Model'].description
-          if (tags['ExposureTime']) exif.exposureTime = tags['ExposureTime'].description
-          if (tags['FNumber']) exif.fNumber = tags['FNumber'].description
-          if (tags['ISOSpeedRatings']) exif.iso = tags['ISOSpeedRatings'].description
-          if (tags['GPSLatitude'] && tags['GPSLongitude']) {
+          if (tags.Thumbnail && tags.Thumbnail.base64) {
+            result.thumbnailUrl = `data:image/jpeg;base64,${tags.Thumbnail.base64}`
+          } else if (tags['Thumbnail'] && tags['Thumbnail'].base64) {
+            result.thumbnailUrl = `data:image/jpeg;base64,${tags['Thumbnail'].base64}`
+          }
+
+          const exifSource = tags.exif || tags
+          if (exifSource['DateTimeOriginal']) exif.dateTime = exifSource['DateTimeOriginal'].description
+          if (exifSource['Make']) exif.make = exifSource['Make'].description
+          if (exifSource['Model']) exif.model = exifSource['Model'].description
+          if (exifSource['ExposureTime']) exif.exposureTime = exifSource['ExposureTime'].description
+          if (exifSource['FNumber']) exif.fNumber = exifSource['FNumber'].description
+          if (exifSource['ISOSpeedRatings']) exif.iso = exifSource['ISOSpeedRatings'].description
+          if (tags.gps && tags.gps.Latitude !== undefined && tags.gps.Longitude !== undefined) {
             exif.gps = {
-              lat: tags['GPSLatitude'].description,
-              lon: tags['GPSLongitude'].description
+              lat: tags.gps.Latitude,
+              lon: tags.gps.Longitude
+            }
+          } else if (exifSource['GPSLatitude'] && exifSource['GPSLongitude']) {
+            exif.gps = {
+              lat: exifSource['GPSLatitude'].description,
+              lon: exifSource['GPSLongitude'].description
             }
           }
-          if (tags['Image Width'] && tags['Image Height']) {
-            exif.width = tags['Image Width'].value
-            exif.height = tags['Image Height'].value
-          } else if (tags['pixelXDimension'] && tags['pixelYDimension']) {
-            exif.width = tags['pixelXDimension'].value
-            exif.height = tags['pixelYDimension'].value
+
+          const fileSource = tags.file || tags
+          if (fileSource['Image Width'] && fileSource['Image Height']) {
+            exif.width = fileSource['Image Width'].value
+            exif.height = fileSource['Image Height'].value
+          } else if (exifSource['PixelXDimension'] && exifSource['PixelYDimension']) {
+            exif.width = exifSource['PixelXDimension'].value
+            exif.height = exifSource['PixelYDimension'].value
+          } else if (exifSource['Image Width'] && exifSource['Image Height']) {
+            exif.width = exifSource['Image Width'].value
+            exif.height = exifSource['Image Height'].value
           }
           result.exif = exif
         } catch (exifErr: any) {
@@ -305,6 +379,49 @@ app.whenReady().then(() => {
     const windows = BrowserWindow.getAllWindows()
     for (const win of windows) {
       win.webContents.send('toggle-hidden-files', showHidden)
+    }
+  })
+
+  ipcMain.handle('window-minimize', () => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) win.minimize()
+  })
+
+  ipcMain.handle('window-maximize', () => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) {
+      if (win.isMaximized()) {
+        win.unmaximize()
+      } else {
+        win.maximize()
+      }
+    }
+  })
+
+  ipcMain.handle('window-close', () => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) win.close()
+  })
+
+  ipcMain.handle('window-is-maximized', () => {
+    const win = BrowserWindow.getFocusedWindow()
+    return win ? win.isMaximized() : false
+  })
+
+  ipcMain.handle('window-reload', () => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) win.webContents.reload()
+  })
+
+  ipcMain.handle('open-path', async (_event, filePath: string) => {
+    try {
+      const error = await shell.openPath(filePath)
+      if (error) {
+        return { success: false, error }
+      }
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
     }
   })
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
-import { Play, Pause, Music as MusicIcon, FileText, Info } from 'lucide-react'
+import { Play, Pause, Music as MusicIcon, FileText, Info, Image as ImageIcon } from 'lucide-react'
 
 interface PreviewPanelProps {
   selectedFile: any
@@ -73,7 +73,7 @@ export default function PreviewPanel({ selectedFile, metadata, loading }: Previe
                     : 'badge-file'
           }`}
         >
-          {selectedFile.isDirectory ? 'Folder' : metadata?.type || 'File'}
+          {selectedFile.isDirectory ? 'Folder' : metadata?.isRaw ? 'RAW Image' : metadata?.type || 'File'}
         </span>
         <div className="preview-header-title">Overview</div>
       </div>
@@ -90,6 +90,8 @@ export default function PreviewPanel({ selectedFile, metadata, loading }: Previe
             file={selectedFile}
             fileUrl={fileUrl}
             exif={metadata.exif}
+            thumbnailUrl={metadata.thumbnailUrl}
+            isRaw={metadata.isRaw}
             formatSize={formatSize}
             formatDate={formatDate}
           />
@@ -166,25 +168,58 @@ function ImagePreview({
   file,
   fileUrl,
   exif,
+  thumbnailUrl,
+  isRaw,
   formatSize,
   formatDate
 }: {
   file: any
   fileUrl: string
   exif: any
+  thumbnailUrl?: string
+  isRaw?: boolean
   formatSize: any
   formatDate: any
 }) {
+  const [imgSrc, setImgSrc] = useState<string>('')
+  const [imgError, setImgError] = useState<boolean>(false)
+
+  useEffect(() => {
+    setImgError(false)
+    if (isRaw && thumbnailUrl) {
+      setImgSrc(thumbnailUrl)
+    } else {
+      setImgSrc(fileUrl || thumbnailUrl || '')
+    }
+  }, [fileUrl, thumbnailUrl, isRaw, file?.path])
+
+  const handleImageError = () => {
+    if (thumbnailUrl && imgSrc !== thumbnailUrl) {
+      setImgSrc(thumbnailUrl)
+    } else {
+      setImgError(true)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="preview-visual-container ratio-image">
-        <img src={fileUrl} className="preview-image" alt={file.name} />
+        {!imgError && imgSrc ? (
+          <img src={imgSrc} className="preview-image" alt={file.name} onError={handleImageError} />
+        ) : (
+          <div className="preview-audio-fallback" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <ImageIcon size={64} style={{ color: 'var(--color-image)' }} />
+            <span style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>
+              {isRaw ? 'RAW Image (No Thumbnail Available)' : 'Image Preview Unavailable'}
+            </span>
+          </div>
+        )}
       </div>
       <div>
         <h3 className="file-title-large">{file.name}</h3>
       </div>
       <div className="metadata-section">
-        <div className="metadata-title">Image Details</div>
+        <div className="metadata-title">{isRaw ? 'RAW Image Details' : 'Image Details'}</div>
         <table className="metadata-table">
           <tbody>
             <tr className="metadata-row">

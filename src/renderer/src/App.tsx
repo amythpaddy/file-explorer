@@ -17,6 +17,7 @@ import {
   Check
 } from 'lucide-react'
 import PreviewPanel from './components/PreviewPanel'
+import TitleBar from './components/TitleBar'
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>('')
@@ -106,6 +107,50 @@ export default function App() {
     }
   }
 
+const RAW_IMAGE_EXTENSIONS = [
+  '.cr2',
+  '.cr3',
+  '.nef',
+  '.nrw',
+  '.arw',
+  '.srf',
+  '.sr2',
+  '.dng',
+  '.orf',
+  '.rw2',
+  '.raw',
+  '.raf',
+  '.pef',
+  '.ptx',
+  '.srw',
+  '.mrw',
+  '.erf',
+  '.kdc',
+  '.dcr',
+  '.rwl',
+  '.bay',
+  '.3fr',
+  '.fff'
+]
+
+const STANDARD_IMAGE_EXTENSIONS = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.tiff',
+  '.tif',
+  '.bmp',
+  '.gif',
+  '.svg',
+  '.ico',
+  '.heic',
+  '.heif',
+  '.avif'
+]
+
+const IMAGE_EXTENSIONS = [...STANDARD_IMAGE_EXTENSIONS, ...RAW_IMAGE_EXTENSIONS]
+
   // Handle single item click (select file/folder)
   const handleItemSelect = async (file: any) => {
     setSelectedFile(file)
@@ -114,7 +159,7 @@ export default function App() {
     if (file.isDirectory) return
 
     const ext = getExtension(file.name)
-    const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)
+    const isImage = IMAGE_EXTENSIONS.includes(ext)
     const isAudio = ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)
     const isVideo = ['.mp4', '.mkv', '.webm', '.avi', '.mov'].includes(ext)
 
@@ -133,10 +178,15 @@ export default function App() {
     }
   }
 
-  // Handle double click (navigate into folders)
-  const handleItemDoubleClick = (file: any) => {
+  // Handle double click (navigate into folders or open files in OS)
+  const handleItemDoubleClick = async (file: any) => {
     if (file.isDirectory) {
       loadDirectory(file.path)
+    } else {
+      const res = await window.api.openPath(file.path)
+      if (!res.success && res.error) {
+        console.error('Failed to open file:', res.error)
+      }
     }
   }
 
@@ -177,7 +227,7 @@ export default function App() {
       return <Folder size={32} className="logo-icon" style={{ color: 'var(--color-folder)' }} />
 
     const ext = getExtension(file.name)
-    if (['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)) {
+    if (IMAGE_EXTENSIONS.includes(ext)) {
       return <ImageIcon size={32} style={{ color: 'var(--color-image)' }} />
     }
     if (['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)) {
@@ -193,7 +243,7 @@ export default function App() {
     if (file.isDirectory) return <Folder size={18} style={{ color: 'var(--color-folder)' }} />
 
     const ext = getExtension(file.name)
-    if (['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)) {
+    if (IMAGE_EXTENSIONS.includes(ext)) {
       return <ImageIcon size={18} style={{ color: 'var(--color-image)' }} />
     }
     if (['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)) {
@@ -235,7 +285,7 @@ export default function App() {
 
     const ext = getExtension(file.name)
     if (filterType === 'image') {
-      return ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)
+      return IMAGE_EXTENSIONS.includes(ext)
     }
     if (filterType === 'audio') {
       return ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)
@@ -315,27 +365,21 @@ export default function App() {
   }
 
   return (
-    <>
-      {/* Left Sidebar */}
-      <div className="sidebar">
-        <div className="sidebar-header">
-          <svg
-            className="logo-icon"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-          <span className="app-title">Media Explorer</span>
-        </div>
+    <div className="app-layout">
+      <TitleBar
+        showHidden={showHidden}
+        viewMode={viewMode}
+        onToggleHidden={() => window.api.toggleHiddenFiles()}
+        onSelectViewMode={(mode) => setViewMode(mode)}
+        onNavigateHome={() => navigateToShortcut('home')}
+      />
 
-        <div className="sidebar-menu">
-          {/* Drives Section */}
-          <div className="menu-section">
+      <div className="app-body">
+        {/* Left Sidebar */}
+        <div className="sidebar">
+          <div className="sidebar-menu">
+            {/* Drives Section */}
+            <div className="menu-section">
             <span className="menu-title">Devices</span>
             {drives.map((drive) => (
               <div
@@ -517,7 +561,7 @@ export default function App() {
                 const selectionClass = isSelected
                   ? file.isDirectory
                     ? 'folder-selected selected'
-                    : ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)
+                    : IMAGE_EXTENSIONS.includes(ext)
                       ? 'image-selected selected'
                       : ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)
                         ? 'audio-selected selected'
@@ -550,7 +594,7 @@ export default function App() {
                 const selectionClass = isSelected
                   ? file.isDirectory
                     ? 'folder-selected selected'
-                    : ['.jpg', '.jpeg', '.png', '.webp', '.tiff'].includes(ext)
+                    : IMAGE_EXTENSIONS.includes(ext)
                       ? 'image-selected selected'
                       : ['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac'].includes(ext)
                         ? 'audio-selected selected'
@@ -580,8 +624,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* Right Preview Panel */}
-      <PreviewPanel selectedFile={selectedFile} metadata={metadata} loading={metadataLoading} />
-    </>
+        {/* Right Preview Panel */}
+        <PreviewPanel selectedFile={selectedFile} metadata={metadata} loading={metadataLoading} />
+      </div>
+    </div>
   )
 }
